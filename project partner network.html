@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>REACH MEL team, project, partner network</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f3f5f8;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #d1d5db;
+      --partner: #1e3a8a;
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Roboto", system-ui, -apple-system, Segoe UI, sans-serif;
+    }
+    .page {
+      width: min(1400px, 96vw);
+      margin: 18px auto;
+      display: grid;
+      gap: 14px;
+    }
+    .banner {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 14px 16px;
+      display: grid;
+      gap: 10px;
+    }
+    .title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .title-wrap h1 {
+      margin: 0;
+      font-size: 23px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .title-wrap p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .actions button {
+      border: 1px solid #c7ced8;
+      background: #fff;
+      color: #0f172a;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .actions button:hover { background: #f8fafc; }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .legend, .stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 13px;
+      color: #334155;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+    #chart {
+      width: 100%;
+      height: calc(100vh - 220px);
+      min-height: 650px;
+      display: block;
+      background: #fcfdff;
+    }
+    .hint {
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      background: rgba(255, 255, 255, 0.93);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 8px;
+      color: var(--muted);
+      font-size: 12px;
+      pointer-events: none;
+    }
+    .tooltip {
+      position: fixed;
+      z-index: 20;
+      pointer-events: none;
+      background: rgba(17, 24, 39, 0.95);
+      color: #fff;
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 12px;
+      transform: translate(10px, 10px);
+      opacity: 0;
+      transition: opacity .14s ease;
+      white-space: nowrap;
+    }
+    .tooltip.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="banner">
+      <div class="title-row">
+        <div class="title-wrap">
+          <h1>REACH MEL team, project, partner network</h1>
+          <p>Interactive network diagram with weighted nodes and link types</p>
+        </div>
+        <div class="actions">
+          <button id="downloadPngBtn" type="button">Download PNG</button>
+        </div>
+      </div>
+      <div class="meta-row">
+        <div class="legend" id="legend"></div>
+        <div class="stats" id="stats"></div>
+      </div>
+    </section>
+    <section class="panel">
+      <svg id="chart" role="img" aria-label="Team project partner radial network diagram"></svg>
+      <div class="hint">Drag nodes, scroll to zoom, hover to highlight links.</div>
+    </section>
+  </div>
+  <div class="tooltip" id="tooltip"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script>
+    const rawRows = [
+      ["EPIC - Pilot", "SM", "CMHN", "NW Health"],
+      ["EPIC - Pilot", "SM", "HLU", "NW Health"],
+      ["IHRP", "CHDN", "NW Health"],
+      ["IHRP", "CHO", "NW Health"],
+      ["IHRP", "CMHN", "NW Health"],
+      ["IHRP", "HLU", "NW Health"],
+      ["IHRP", "MFM", "NW Health"],
+      ["IHRP", "UMMGAA", "NW Health"],
+      ["PHC", "BMA", "SE Health"],
+      ["PHC", "BPHWT", "SE Health"],
+      ["PHC", "KDHW", "SE Health"],
+      ["PROSPER", "H2H", "Non-Health"],
+      ["PROSPER", "OTO", "Non-Health"],
+      ["PROSPER", "NM", "Non-Health"],
+      ["PROSPER", "CMHN", "Non-Health"],
+      ["PROSPER", "WEA", "Non-Health"],
+      ["REACH KK", "BMA", "SE Health"],
+      ["REACH KK", "CHDN", "SE Health"],
+      ["REACH KK", "KDHW", "SE Health"],
+      ["REACH SM", "HLU", "NW Health"],
+      ["REACH SM", "MFM", "NW Health"],
+      ["REACH SM", "OTO", "NW Health"],
+      ["REACH SM", "UMMGAA", "NW Health"],
+      ["SCoPE", "CBEM", "Non-Health"],
+      ["SCoPE", "WEA", "Non-Health"],
+      ["SCoPE", "CMHN", "Non-Health"],
+      ["SCoPE", "H2H", "Non-Health"],
+      ["SCoPE", "HLDO", "Non-Health"],
+      ["SCoPE", "JW", "Non-Health"],
+      ["SCoPE", "OTO", "Non-Health"],
+      ["SCoPE", "UMMGAA", "Non-Health"],
+      ["SHARP", "KDHW", "SE Health"],
+      ["SPP", "KDHW", "SE Health"],
+      ["Thrive", "SYDO", "Non-Health"],
+      ["Thrive", "DDA", "Non-Health"],
+      ["Thrive", "DT", "Non-Health"],
+      ["Thrive", "TKP", "Non-Health"],
+      ["Thrive", "TWU", "Non-Health"],
+      ["Thrive", "KSK", "Non-Health"],
+      ["Thrive", "CL", "Non-Health"],
+      ["Thrive", "TRIPNET", "Non-Health"],
+      ["SIPD", "KHP", "SE Health"],
+      ["SWAGiM", "KDHW", "SE Health"],
+      ["SWAGiM", "KWO", "SE Health"],
+      ["SWAGiM", "KnWO", "SE Health"],
+      ["SWAGiM", "Four Rivers", "SE Health"],
+      ["DFAT", "KWO", "SE Health"]
+    ];
+
+    const width = 1360;
+    const height = 880;
+    const centerX = width / 2;
+    const centerY = height / 2 + 16;
+
+    const teamColors = {
+      "NW Health": "#fca5a5",
+      "SE Health": "#c4b5fd",
+      "Non-Health": "#86efac"
+    };
+    const partnerColor = "#93c5fd";
+
+    const projectMeta = new Map();
+    const partnerMeta = new Map();
+    const teamProjects = new Map();
+    const projectPartners = new Map();
+    const uniqueProjectPartner = new Set();
+
+    rawRows.forEach(row => {
+      const [project, maybeTeamCode, partnerOrTeam, maybeTeam] = row;
+      const partner = maybeTeam ? partnerOrTeam : maybeTeamCode;
+      const team = maybeTeam || partnerOrTeam;
+
+      if (!teamProjects.has(team)) teamProjects.set(team, new Set());
+      teamProjects.get(team).add(project);
+
+      if (!projectPartners.has(project)) projectPartners.set(project, new Set());
+      projectPartners.get(project).add(partner);
+
+      if (!projectMeta.has(project)) projectMeta.set(project, new Set());
+      projectMeta.get(project).add(team);
+
+      if (!partnerMeta.has(partner)) partnerMeta.set(partner, new Set());
+      partnerMeta.get(partner).add(project);
+
+      uniqueProjectPartner.add(`${project}|||${partner}`);
+    });
+
+    const nodes = [];
+    const links = [];
+
+    nodes.push({
+      id: "center:REACH",
+      type: "center",
+      name: "REACH",
+      count: projectMeta.size,
+      color: "#0f172a"
+    });
+
+    [...projectMeta.keys()].sort().forEach(project => {
+      const teams = [...projectMeta.get(project)];
+      nodes.push({
+        id: `project:${project}`,
+        type: "project",
+        name: project,
+        count: projectPartners.get(project).size,
+        teams, // retained for mapping projects to team color groups
+        color: teams.length === 1 ? (teamColors[teams[0]] || "#64748b") : "#6366f1"
+      });
+    });
+
+    [...partnerMeta.keys()].sort().forEach(partner => {
+      nodes.push({
+        id: `partner:${partner}`,
+        type: "partner",
+        name: partner,
+        count: partnerMeta.get(partner).size,
+        color: partnerColor
+      });
+    });
+
+    [...projectMeta.keys()].forEach(project => {
+      links.push({
+        source: "center:REACH",
+        target: `project:${project}`,
+        kind: "teamProject"
+      });
+    });
+
+    uniqueProjectPartner.forEach(value => {
+      const [project, partner] = value.split("|||");
+      links.push({
+        source: `project:${project}`,
+        target: `partner:${partner}`,
+        kind: "projectPartner"
+      });
+    });
+
+    const svg = d3.select("#chart")
+      .attr("viewBox", `0 0 ${width} ${height}`);
+
+    const main = svg.append("g");
+
+    svg.call(d3.zoom()
+      .scaleExtent([0.55, 2.5])
+      .on("zoom", (event) => main.attr("transform", event.transform)));
+
+    const centerNode = nodes.find(d => d.type === "center");
+    const projectNodes = nodes.filter(d => d.type === "project");
+    const partnerNodes = nodes.filter(d => d.type === "partner");
+
+    const ringR = {
+      project: 360,
+      partnerOffset: 95
+    };
+
+    const projectTarget = new Map();
+    const partnerTarget = new Map();
+    const teamOrder = ["NW Health", "SE Health", "Non-Health"];
+    const teamBaseAngle = new Map(
+      teamOrder.map((team, idx) => [team, -Math.PI / 2 + (idx * (Math.PI * 2 / teamOrder.length))])
+    );
+    centerNode.x = centerX;
+    centerNode.y = centerY;
+
+    // Projects: equally distributed in sectors by team around central REACH node.
+    const projectsByTeam = new Map();
+    projectNodes.forEach(projectNode => {
+      const primaryTeam = [...projectMeta.get(projectNode.name)].sort()[0];
+      if (!projectsByTeam.has(primaryTeam)) projectsByTeam.set(primaryTeam, []);
+      projectsByTeam.get(primaryTeam).push(projectNode.name);
+    });
+    projectsByTeam.forEach((projectNames, teamName) => {
+      projectNames.sort();
+      const tA = teamBaseAngle.get(teamName) || 0;
+      const arcSpan = Math.min(Math.PI * 0.9, Math.max(Math.PI * 0.35, projectNames.length * 0.24));
+      const step = projectNames.length > 1 ? arcSpan / (projectNames.length - 1) : 0;
+      const start = tA - arcSpan / 2;
+      projectNames.forEach((projectName, idx) => {
+        const a = projectNames.length > 1 ? start + idx * step : tA;
+        const tx = centerX + Math.cos(a) * ringR.project;
+        const ty = centerY + Math.sin(a) * ringR.project;
+        projectTarget.set(projectName, { x: tx, y: ty, a });
+      });
+    });
+    projectNodes.forEach((d, i) => {
+      const pt = projectTarget.get(d.name);
+      if (pt) {
+        d.x = pt.x;
+        d.y = pt.y;
+      } else {
+        const a = (i / projectNodes.length) * (Math.PI * 2) - Math.PI / 2;
+        d.x = centerX + Math.cos(a) * ringR.project;
+        d.y = centerY + Math.sin(a) * ringR.project;
+      }
+    });
+
+    // Partners: equally distributed around each linked project.
+    const partnerCandidates = new Map();
+    projectNodes.forEach(projectNode => {
+      const projectName = projectNode.name;
+      const pCenter = projectTarget.get(projectName) || { x: projectNode.x, y: projectNode.y, a: 0 };
+      const partners = [...projectPartners.get(projectName)].sort();
+      partners.forEach((partnerName, idx) => {
+        const n = partners.length;
+        const a = n > 1
+          ? (pCenter.a || 0) - Math.PI / 2 + (idx * (Math.PI * 2) / n)
+          : (pCenter.a || 0) + Math.PI / 2;
+        const tx = pCenter.x + Math.cos(a) * ringR.partnerOffset;
+        const ty = pCenter.y + Math.sin(a) * ringR.partnerOffset;
+        if (!partnerCandidates.has(partnerName)) partnerCandidates.set(partnerName, []);
+        partnerCandidates.get(partnerName).push({ x: tx, y: ty });
+      });
+    });
+    partnerNodes.forEach((d, i) => {
+      const candidates = partnerCandidates.get(d.name) || [];
+      if (candidates.length) {
+        const tx = d3.mean(candidates, c => c.x);
+        const ty = d3.mean(candidates, c => c.y);
+        partnerTarget.set(d.name, { x: tx, y: ty });
+        d.x = tx;
+        d.y = ty;
+      } else {
+        const a = (i / partnerNodes.length) * (Math.PI * 2) - Math.PI / 2;
+        d.x = centerX + Math.cos(a) * (ringR.project + ringR.partnerOffset);
+        d.y = centerY + Math.sin(a) * (ringR.project + ringR.partnerOffset);
+      }
+    });
+
+    const radius = d => {
+      if (d.type === "center") return 20 + d.count * 0.45;
+      if (d.type === "project") return 8 + d.count * 2.1;
+      return 8 + d.count * 2.1;
+    };
+
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links)
+        .id(d => d.id)
+        .distance(l => l.kind === "teamProject" ? 95 : 62)
+        .strength(l => l.kind === "teamProject" ? 0.35 : 0.28))
+      .force("charge", d3.forceManyBody().strength(-155))
+      .force("center", d3.forceCenter(centerX, centerY))
+      .force("collide", d3.forceCollide().radius(d => radius(d) + 10).iterations(2))
+      .force("x", d3.forceX(d => {
+        if (d.type === "center") return centerX;
+        if (d.type === "project") return (projectTarget.get(d.name) || { x: centerX }).x;
+        return (partnerTarget.get(d.name) || { x: centerX }).x;
+      }).strength(d => d.type === "center" ? 0.45 : (d.type === "project" ? 0.22 : 0.2)))
+      .force("y", d3.forceY(d => {
+        if (d.type === "center") return centerY;
+        if (d.type === "project") return (projectTarget.get(d.name) || { y: centerY }).y;
+        return (partnerTarget.get(d.name) || { y: centerY }).y;
+      }).strength(d => d.type === "center" ? 0.45 : (d.type === "project" ? 0.22 : 0.2)))
+      .alpha(0.8)
+      .velocityDecay(0.22)
+      .alphaDecay(0.018)
+      .alphaMin(0.0008);
+
+    const link = main.append("g")
+      .attr("stroke-linecap", "round")
+      .selectAll("line")
+      .data(links)
+      .join("line")
+      .attr("stroke", d => d.kind === "teamProject" ? "#64748b" : "#94a3b8")
+      .attr("stroke-width", d => d.kind === "teamProject" ? 1.7 : 1.35)
+      .attr("stroke-dasharray", d => d.kind === "projectPartner" ? "4 5" : "0");
+
+    const node = main.append("g")
+      .selectAll("g")
+      .data(nodes)
+      .join("g")
+      .attr("class", "node")
+      .call(
+        d3.drag()
+          .on("start", dragStarted)
+          .on("drag", dragged)
+          .on("end", dragEnded)
+      );
+
+    node.append("circle")
+      .attr("r", radius)
+      .attr("fill", d => d.color)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 1.9);
+
+    const truncate = (text, maxChars = 20) =>
+      text.length > maxChars ? `${text.slice(0, maxChars - 3)}...` : text;
+
+    node.append("text")
+      .attr("dy", d => -(radius(d) + 7))
+      .attr("text-anchor", "middle")
+      .style("font-size", d => d.type === "center" ? "13px" : "11.5px")
+      .style("font-weight", d => d.type === "center" ? 700 : 500)
+      .style("fill", "#1f2937")
+      .text(d => truncate(d.name));
+
+    node.append("text")
+      .attr("dy", "0.35em")
+      .attr("text-anchor", "middle")
+      .style("font-size", d => d.type === "center" ? "14px" : "11.5px")
+      .style("font-weight", 700)
+      .style("fill", "#ffffff")
+      .style("pointer-events", "none")
+      .text(d => `${d.count}`);
+
+    const linkedByKey = new Set(links.map(d => `${d.source.id || d.source}->${d.target.id || d.target}`));
+    const isLinked = (a, b) =>
+      linkedByKey.has(`${a.id}->${b.id}`) || linkedByKey.has(`${b.id}->${a.id}`) || a.id === b.id;
+
+    const tooltip = d3.select("#tooltip");
+    let selectedNode = null;
+
+    function getSelectionStats(focusNode) {
+      if (!focusNode || focusNode.type === "center") {
+        return {
+          teamGroups: teamOrder.length,
+          projects: projectNodes.length,
+          partners: partnerNodes.length
+        };
+      }
+
+      const selectedSet = new Set([focusNode.id]);
+      links.forEach(l => {
+        if (l.source.id === focusNode.id) selectedSet.add(l.target.id);
+        if (l.target.id === focusNode.id) selectedSet.add(l.source.id);
+      });
+
+      const selectedNodes = nodes.filter(n => selectedSet.has(n.id));
+      const selectedProjects = selectedNodes.filter(n => n.type === "project");
+      const selectedPartners = selectedNodes.filter(n => n.type === "partner");
+
+      const teamGroups = new Set();
+      selectedProjects.forEach(p => {
+        (projectMeta.get(p.name) || []).forEach(t => teamGroups.add(t));
+      });
+
+      return {
+        teamGroups: teamGroups.size,
+        projects: selectedProjects.length,
+        partners: selectedPartners.length
+      };
+    }
+
+    function renderStats(focusNode = null) {
+      const stats = document.getElementById("stats");
+      const { teamGroups, projects, partners } = getSelectionStats(focusNode);
+      stats.innerHTML = "";
+      [
+        `Team Groups: ${teamGroups}`,
+        `Projects: ${projects}`,
+        `Partners: ${partners}`
+      ].forEach(text => {
+        const el = document.createElement("span");
+        el.className = "pill";
+        el.textContent = text;
+        stats.appendChild(el);
+      });
+    }
+
+    function clearHighlight() {
+      node.style("opacity", 1);
+      link.style("opacity", 1).style("stroke-width", d => d.kind === "teamProject" ? 1.7 : 1.35);
+    }
+
+    function applyHighlight(focusNode) {
+      if (!focusNode) {
+        clearHighlight();
+        return;
+      }
+
+      node.style("opacity", n => isLinked(focusNode, n) ? 1 : 0.16);
+      link
+        .style("opacity", l => l.source.id === focusNode.id || l.target.id === focusNode.id ? 1 : 0.12)
+        .style("stroke-width", l => l.source.id === focusNode.id || l.target.id === focusNode.id ? 2.6 : (l.kind === "teamProject" ? 1.7 : 1.35));
+    }
+
+    node
+      .on("mouseenter", function(event, d) {
+        applyHighlight(selectedNode || d);
+
+        tooltip
+          .classed("show", true)
+          .html(`${d.name}<br/>Count: ${d.count}`);
+      })
+      .on("mousemove", function(event) {
+        tooltip
+          .style("left", `${event.clientX}px`)
+          .style("top", `${event.clientY}px`);
+      })
+      .on("mouseleave", function() {
+        applyHighlight(selectedNode);
+        tooltip.classed("show", false);
+      })
+      .on("click", function(event, d) {
+        event.stopPropagation();
+        selectedNode = selectedNode && selectedNode.id === d.id ? null : d;
+        applyHighlight(selectedNode);
+        renderStats(selectedNode);
+      });
+
+    svg.on("click", function() {
+      selectedNode = null;
+      applyHighlight(null);
+      renderStats(null);
+      tooltip.classed("show", false);
+    });
+
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      node.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+
+    function dragStarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.25).restart();
+      d.fx = d.x;
+      d.fy = d.y;
+    }
+
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function clampToChartBounds(x, y, r) {
+      const margin = r + 10;
+      return {
+        x: clamp(x, margin, width - margin),
+        y: clamp(y, margin, height - margin)
+      };
+    }
+
+    function getNodeAnchor(d) {
+      if (d.type === "project") return projectTarget.get(d.name) || { x: d.x, y: d.y };
+      if (d.type === "partner") return partnerTarget.get(d.name) || { x: d.x, y: d.y };
+      return { x: centerX, y: centerY };
+    }
+
+    function setNodeAnchor(d, anchor) {
+      if (d.type === "project") {
+        const prev = projectTarget.get(d.name) || {};
+        projectTarget.set(d.name, { ...prev, x: anchor.x, y: anchor.y });
+      } else if (d.type === "partner") {
+        partnerTarget.set(d.name, { x: anchor.x, y: anchor.y });
+      }
+    }
+
+    function segmentIntersects(a, b, c, d) {
+      const orientation = (p, q, r) => (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
+      const onSegment = (p, q, r) =>
+        Math.min(p.x, r.x) <= q.x && q.x <= Math.max(p.x, r.x) &&
+        Math.min(p.y, r.y) <= q.y && q.y <= Math.max(p.y, r.y);
+
+      const o1 = orientation(a, b, c);
+      const o2 = orientation(a, b, d);
+      const o3 = orientation(c, d, a);
+      const o4 = orientation(c, d, b);
+
+      if (o1 * o2 < 0 && o3 * o4 < 0) return true;
+      if (o1 === 0 && onSegment(a, c, b)) return true;
+      if (o2 === 0 && onSegment(a, d, b)) return true;
+      if (o3 === 0 && onSegment(c, a, d)) return true;
+      if (o4 === 0 && onSegment(c, b, d)) return true;
+      return false;
+    }
+
+    function getConnectedLinks(targetNode) {
+      return links.filter(l => l.source.id === targetNode.id || l.target.id === targetNode.id);
+    }
+
+    function linkEndpointPosition(linkEnd) {
+      return { x: linkEnd.x, y: linkEnd.y };
+    }
+
+    function localCostForPosition(dragNode, trialPos, draggedPos) {
+      const r1 = radius(dragNode);
+      let overlapPenalty = 0;
+      let crossingPenalty = 0;
+      let linkLengthPenalty = 0;
+
+      nodes.forEach(other => {
+        if (other.id === dragNode.id) return;
+        const dx = trialPos.x - other.x;
+        const dy = trialPos.y - other.y;
+        const dist = Math.hypot(dx, dy) || 0.0001;
+        const minDist = r1 + radius(other) + 10;
+        if (dist < minDist) {
+          overlapPenalty += (minDist - dist) * (minDist - dist);
+        }
+      });
+
+      const connected = getConnectedLinks(dragNode);
+      const otherLinks = links.filter(l => l.source.id !== dragNode.id && l.target.id !== dragNode.id);
+
+      connected.forEach(cl => {
+        const neighbor = cl.source.id === dragNode.id ? cl.target : cl.source;
+        const nPos = linkEndpointPosition(neighbor);
+        linkLengthPenalty += Math.hypot(trialPos.x - nPos.x, trialPos.y - nPos.y);
+
+        otherLinks.forEach(ol => {
+          if (
+            ol.source.id === neighbor.id || ol.target.id === neighbor.id
+          ) return;
+          const a = linkEndpointPosition(ol.source);
+          const b = linkEndpointPosition(ol.target);
+          if (segmentIntersects(trialPos, nPos, a, b)) crossingPenalty += 1;
+        });
+      });
+
+      const dragDistance = Math.hypot(trialPos.x - draggedPos.x, trialPos.y - draggedPos.y);
+
+      return (overlapPenalty * 1.6) + (crossingPenalty * 180) + (linkLengthPenalty * 0.04) + (dragDistance * 0.3);
+    }
+
+    function bestPlacementNearDrop(d, x, y) {
+      const base = clampToChartBounds(x, y, radius(d));
+      const steps = [0, 16, 28, 42, 60, 82, 108];
+      const angles = 16;
+      const candidates = [{ x: base.x, y: base.y }];
+
+      steps.slice(1).forEach(step => {
+        for (let i = 0; i < angles; i++) {
+          const a = (i / angles) * Math.PI * 2;
+          const candidate = clampToChartBounds(
+            base.x + Math.cos(a) * step,
+            base.y + Math.sin(a) * step,
+            radius(d)
+          );
+          candidates.push(candidate);
+        }
+      });
+
+      let best = candidates[0];
+      let bestScore = Number.POSITIVE_INFINITY;
+      candidates.forEach(c => {
+        const score = localCostForPosition(d, c, base);
+        if (score < bestScore) {
+          bestScore = score;
+          best = c;
+        }
+      });
+      return best;
+    }
+
+    function maybeSwapWithNearbySameType(d, placement) {
+      const thresholdBase = radius(d) + 18;
+      const nearby = nodes
+        .filter(other => other.id !== d.id && other.type === d.type)
+        .map(other => {
+          const dist = Math.hypot(other.x - placement.x, other.y - placement.y);
+          return { other, dist };
+        })
+        .filter(entry => entry.dist < thresholdBase + radius(entry.other))
+        .sort((a, b) => a.dist - b.dist);
+
+      if (!nearby.length) return false;
+
+      const target = nearby[0].other;
+      const originalAnchor = getNodeAnchor(d);
+      const targetAnchor = getNodeAnchor(target);
+      setNodeAnchor(d, targetAnchor);
+      setNodeAnchor(target, originalAnchor);
+      return true;
+    }
+
+    function dragEnded(event, d) {
+      const placement = bestPlacementNearDrop(d, event.x, event.y);
+      const swapped = maybeSwapWithNearbySameType(d, placement);
+
+      if (!swapped) {
+        setNodeAnchor(d, placement);
+      }
+
+      d.fx = null;
+      d.fy = null;
+      simulation.alphaTarget(0.3).restart();
+      setTimeout(() => simulation.alphaTarget(0), 500);
+    }
+
+    function renderLegend() {
+      const legend = document.getElementById("legend");
+      legend.innerHTML = "";
+      [
+        { label: "NW Health", color: teamColors["NW Health"] },
+        { label: "SE Health", color: teamColors["SE Health"] },
+        { label: "Non-Health", color: teamColors["Non-Health"] },
+        { label: "Partner", color: partnerColor }
+      ].forEach(item => {
+        const el = document.createElement("span");
+        el.className = "pill";
+        el.innerHTML = `<span class="dot" style="background:${item.color}"></span>${item.label}`;
+        legend.appendChild(el);
+      });
+    }
+
+    async function downloadPNG() {
+      const svgEl = document.getElementById("chart");
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svgEl);
+      const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width * 2;
+        canvas.height = height * 2;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fcfdff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        const link = document.createElement("a");
+        link.download = "reach-mel-network.png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+      };
+      img.src = url;
+    }
+
+    document.getElementById("downloadPngBtn").addEventListener("click", downloadPNG);
+    renderLegend();
+    renderStats();
+  </script>
+</body>
+</html>
